@@ -1,0 +1,81 @@
+[
+  {
+    "timestamp": "2024-11-19T11:54:21+00:00",
+    "user": "admin",
+    "device": "LAPTOP-DEV",
+    "ip": "10.0.0.100",
+    "event_type": "process_start",
+    "source": "endpoint",
+    "process": "mimikatz.exe"
+  },
+  {
+    "timestamp": "2024-11-19T16:12:17+00:00",
+    "user": "svc_backup",
+    "device": "WS-003",
+    "ip": "10.0.0.5",
+    "event_type": "file_access",
+    "source": "endpoint",
+    "process": "explorer.exe"
+  },
+  {
+    "timestamp": "2024-11-19T16:14:17+00:00",
+    "user": "svc_backup",
+    "device": "WS-003",
+    "ip": "10.0.0.5",
+    "event_type": "file_access",
+    "source": "endpoint",
+    "process": "code.exe"
+  },
+  {
+    "timestamp": "2024-11-19T18:21:17+00:00",
+    "user": "svc_backup",
+    "device": "WS-003",
+    "ip": "10.0.0.5",
+    "event_type": "file_access",
+    "source": "endpoint",
+    "process": "outlook.exe"
+  },
+  {
+    "timestamp": "2024-11-20T15:40:53+00:00",
+    "user": "admin",
+    "device": "WS-002",
+    "ip": "192.168.1.200",
+    "event_type": "process_start",
+    "source": "endpoint",
+    "process": "powershell.exe -Command Get-Process"
+  },
+  {
+    "timestamp": "2024-11-20T15:45:53+00:00",
+    "user": "admin",
+    "device": "WS-002",
+    "ip": "192.168.1.200",
+    "event_type": "process_start",
+    "source": "endpoint",
+    "process": "powershell.exe -Command Get-Service"
+  },
+  {
+    "timestamp": "2024-11-20T17:24:51+00:00",
+    "user": "bob",
+    "device": "WS-001",
+    "ip": "172.16.0.20",
+    "event_type": "privilege_escalation",
+    "source": "endpoint"
+  },
+  {
+    "timestamp": "2024-11-20T17:28:51+00:00",
+    "user": "bob",
+    "device": "WS-001",
+    "ip": "172.16.0.20",
+    "event_type": "process_start",
+    "source": "endpoint",
+    "process": "psexec.exe \\\\SRV-DC01 cmd"
+  },
+  {
+    "timestamp": "2024-11-22T12:55:55+00:00",
+    "user": "admin",
+    "device": "SRV-DC01",
+    "ip": "10.0.0.55",
+    "event_type": "privilege_escalation",
+    "source": "endpoint"
+  }
+]

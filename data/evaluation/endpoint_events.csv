@@ -1,0 +1,10 @@
+timestamp,user,device,ip,event_type,source,process
+2024-11-18T11:52:26+00:00,charlie,WS-001,10.0.0.5,admin_privileges_granted,endpoint,
+2024-11-18T13:38:58+00:00,admin,SRV-DC01,192.168.1.11,process_start,endpoint,powershell.exe -enc SQBFAFgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQA
+2024-11-19T08:46:54+00:00,developer1,SRV-APP01,192.168.1.200,file_access,endpoint,explorer.exe
+2024-11-19T09:00:54+00:00,developer1,SRV-APP01,192.168.1.200,file_access,endpoint,chrome.exe
+2024-11-19T09:03:54+00:00,developer1,SRV-APP01,192.168.1.200,file_access,endpoint,outlook.exe
+2024-11-21T14:58:10+00:00,developer1,WS-003,192.168.1.10,process_start,endpoint,powershell.exe -Command Get-Process
+2024-11-21T15:03:10+00:00,developer1,WS-003,192.168.1.10,process_start,endpoint,powershell.exe -Command Get-Service
+2024-11-22T09:28:55+00:00,bob,WS-003,10.0.0.55,privilege_escalation,endpoint,
+2024-11-22T09:32:55+00:00,bob,WS-003,10.0.0.55,process_start,endpoint,procdump.exe -ma lsass.exe

@@ -1,0 +1,242 @@
+[
+  {
+    "timestamp": "2024-11-18T11:14:32+00:00",
+    "user": "admin",
+    "device": "WS-001",
+    "ip": "192.168.1.10",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-18T11:14:47+00:00",
+    "user": "admin",
+    "device": "WS-001",
+    "ip": "192.168.1.10",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-18T11:15:35+00:00",
+    "user": "admin",
+    "device": "WS-001",
+    "ip": "192.168.1.10",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-18T11:15:36+00:00",
+    "user": "admin",
+    "device": "WS-001",
+    "ip": "192.168.1.10",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-18T11:17:00+00:00",
+    "user": "admin",
+    "device": "WS-001",
+    "ip": "192.168.1.10",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-18T11:17:27+00:00",
+    "user": "admin",
+    "device": "WS-001",
+    "ip": "192.168.1.10",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-18T11:18:32+00:00",
+    "user": "admin",
+    "device": "WS-001",
+    "ip": "192.168.1.10",
+    "event_type": "login_success",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-19T02:00:00+00:00",
+    "user": "admin",
+    "device": "SRV-APP01",
+    "ip": "192.168.1.11",
+    "event_type": "login_success",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-19T11:08:47+00:00",
+    "user": "alice",
+    "device": "WS-001",
+    "ip": "10.0.0.100",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-19T11:09:28+00:00",
+    "user": "alice",
+    "device": "WS-001",
+    "ip": "10.0.0.100",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-19T11:10:13+00:00",
+    "user": "alice",
+    "device": "WS-001",
+    "ip": "10.0.0.100",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-19T11:10:37+00:00",
+    "user": "alice",
+    "device": "WS-001",
+    "ip": "10.0.0.100",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-19T11:11:11+00:00",
+    "user": "alice",
+    "device": "WS-001",
+    "ip": "10.0.0.100",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-19T11:11:15+00:00",
+    "user": "alice",
+    "device": "WS-001",
+    "ip": "10.0.0.100",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-19T11:12:35+00:00",
+    "user": "alice",
+    "device": "WS-001",
+    "ip": "10.0.0.100",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-19T11:48:21+00:00",
+    "user": "admin",
+    "device": "LAPTOP-DEV",
+    "ip": "10.0.0.100",
+    "event_type": "login_success",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-19T15:24:17+00:00",
+    "user": "svc_backup",
+    "device": "WS-003",
+    "ip": "10.0.0.5",
+    "event_type": "login_success",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-19T22:24:17+00:00",
+    "user": "svc_backup",
+    "device": "WS-003",
+    "ip": "10.0.0.5",
+    "event_type": "logout",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-20T11:42:17+00:00",
+    "user": "developer1",
+    "device": "WS-003",
+    "ip": "172.16.0.20",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-20T11:42:47+00:00",
+    "user": "developer1",
+    "device": "WS-003",
+    "ip": "172.16.0.20",
+    "event_type": "login_success",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-20T17:16:51+00:00",
+    "user": "bob",
+    "device": "WS-001",
+    "ip": "172.16.0.20",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-20T17:17:34+00:00",
+    "user": "bob",
+    "device": "WS-001",
+    "ip": "172.16.0.20",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-20T17:17:59+00:00",
+    "user": "bob",
+    "device": "WS-001",
+    "ip": "172.16.0.20",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-20T17:18:23+00:00",
+    "user": "bob",
+    "device": "WS-001",
+    "ip": "172.16.0.20",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-20T17:18:42+00:00",
+    "user": "bob",
+    "device": "WS-001",
+    "ip": "172.16.0.20",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-20T17:21:51+00:00",
+    "user": "bob",
+    "device": "WS-001",
+    "ip": "172.16.0.20",
+    "event_type": "login_success",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-22T11:45:04+00:00",
+    "user": "bob",
+    "device": "SRV-APP01",
+    "ip": "172.16.0.20",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-22T11:45:16+00:00",
+    "user": "bob",
+    "device": "SRV-APP01",
+    "ip": "172.16.0.20",
+    "event_type": "login_failure",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-22T11:46:04+00:00",
+    "user": "bob",
+    "device": "SRV-APP01",
+    "ip": "172.16.0.20",
+    "event_type": "login_success",
+    "source": "authentication"
+  },
+  {
+    "timestamp": "2024-11-22T12:51:55+00:00",
+    "user": "admin",
+    "device": "SRV-DC01",
+    "ip": "10.0.0.55",
+    "event_type": "login_success",
+    "source": "authentication"
+  }
+]

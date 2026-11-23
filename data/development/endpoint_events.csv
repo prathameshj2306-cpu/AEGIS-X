@@ -1,0 +1,10 @@
+timestamp,user,device,ip,event_type,source,process
+2024-11-19T11:54:21+00:00,admin,LAPTOP-DEV,10.0.0.100,process_start,endpoint,mimikatz.exe
+2024-11-19T16:12:17+00:00,svc_backup,WS-003,10.0.0.5,file_access,endpoint,explorer.exe
+2024-11-19T16:14:17+00:00,svc_backup,WS-003,10.0.0.5,file_access,endpoint,code.exe
+2024-11-19T18:21:17+00:00,svc_backup,WS-003,10.0.0.5,file_access,endpoint,outlook.exe
+2024-11-20T15:40:53+00:00,admin,WS-002,192.168.1.200,process_start,endpoint,powershell.exe -Command Get-Process
+2024-11-20T15:45:53+00:00,admin,WS-002,192.168.1.200,process_start,endpoint,powershell.exe -Command Get-Service
+2024-11-20T17:24:51+00:00,bob,WS-001,172.16.0.20,privilege_escalation,endpoint,
+2024-11-20T17:28:51+00:00,bob,WS-001,172.16.0.20,process_start,endpoint,psexec.exe \\SRV-DC01 cmd
+2024-11-22T12:55:55+00:00,admin,SRV-DC01,10.0.0.55,privilege_escalation,endpoint,

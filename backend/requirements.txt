@@ -1,0 +1,18 @@
+# Phase 1 — Backend core dependencies
+# Pinned versions for reproducibility and offline operation
+
+pydantic==2.10.6
+pandas==2.2.3
+python-dateutil==2.9.0.post0
+
+# Testing
+pytest==8.3.4
+pytest-cov==6.0.0
+
+# Phase 2 — Local SLM & API dependencies
+httpx==0.28.1
+# fastapi==0.115.6
+# uvicorn==0.34.0
+# requests==2.32.3
+# scikit-learn==1.6.1
+# jinja2==3.1.5

@@ -1,0 +1,92 @@
+{
+  "dataset_name": "evaluation",
+  "seed": 7777,
+  "generated_at": "2026-11-23T12:13:02.972824+00:00",
+  "total_events": 39,
+  "auth_events": 30,
+  "endpoint_events": 9,
+  "scenarios": [
+    {
+      "scenario_id": "S001_MAL_BF_001",
+      "name": "Brute-Force Login Attack",
+      "is_malicious": true,
+      "expected_rules": [
+        "brute_force_login"
+      ],
+      "description": "7 failed login attempts for user 'bob' within ~5 minutes."
+    },
+    {
+      "scenario_id": "S002_MAL_BFS_001",
+      "name": "Brute-Force with Successful Login",
+      "is_malicious": true,
+      "expected_rules": [
+        "brute_force_login"
+      ],
+      "description": "6 failed logins followed by success for user 'admin'."
+    },
+    {
+      "scenario_id": "S003_MAL_PE_001",
+      "name": "Privilege Escalation",
+      "is_malicious": true,
+      "expected_rules": [
+        "privilege_escalation"
+      ],
+      "description": "User 'charlie' escalated privileges (admin_privileges_granted)."
+    },
+    {
+      "scenario_id": "S004_MAL_SP_001",
+      "name": "Suspicious Process Execution",
+      "is_malicious": true,
+      "expected_rules": [
+        "suspicious_process"
+      ],
+      "description": "Suspicious process 'powershell.exe' executed by 'admin'."
+    },
+    {
+      "scenario_id": "S005_MAL_MSA_001",
+      "name": "Multi-Stage Attack Chain",
+      "is_malicious": true,
+      "expected_rules": [
+        "brute_force_login",
+        "privilege_escalation",
+        "suspicious_process"
+      ],
+      "description": "Coordinated attack: brute-force \u2192 login \u2192 privilege escalation \u2192 suspicious process by 'bob'."
+    },
+    {
+      "scenario_id": "S006_BEN_FP_001",
+      "name": "Benign Password Mistype",
+      "is_malicious": false,
+      "expected_rules": [],
+      "description": "User 'operator_lee' mistyped password twice, then succeeded. Normal behavior."
+    },
+    {
+      "scenario_id": "S007_BEN_NL_001",
+      "name": "Authorized Night Login",
+      "is_malicious": false,
+      "expected_rules": [],
+      "description": "Admin 'admin' logged in at 02:00 \u2014 has authorized night schedule."
+    },
+    {
+      "scenario_id": "S008_BEN_PS_001",
+      "name": "Legitimate PowerShell Usage",
+      "is_malicious": false,
+      "expected_rules": [],
+      "description": "User 'developer1' ran normal PowerShell commands. Not malicious."
+    },
+    {
+      "scenario_id": "S009_BEN_SF_001",
+      "name": "Single Failed Login",
+      "is_malicious": false,
+      "expected_rules": [],
+      "description": "User 'alice' had one failed login, then succeeded. Normal."
+    },
+    {
+      "scenario_id": "S010_BEN_NA_001",
+      "name": "Normal User Activity",
+      "is_malicious": false,
+      "expected_rules": [],
+      "description": "User 'developer1' normal workday: login, file access, logout."
+    }
+  ]
+}

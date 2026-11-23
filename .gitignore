@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# OS
+Thumbs.db
+.DS_Store
+
+# Node (Phase 4)
+node_modules/
+frontend/dist/
+
+# Generated data (keep samples, not bulk generated)
+data/generated/
+
+# Logs
+*.log
+
+# Model files
+*.gguf
+*.bin
