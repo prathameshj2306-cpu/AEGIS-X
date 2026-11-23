@@ -49,8 +49,15 @@ from app.ai.fallback import generate_deterministic_fallback
 from app.ai.prompts import SYSTEM_PROMPT, build_incident_prompt
 from app.ai.schemas import AIAnalysisOutput, AIStatus
 from app.config import AegisConfig
+from app.database.store import AegisDatabase
 from app.schemas.events import EventSource, NormalizedEvent
 from app.schemas.incidents import Detection, Incident, IncidentStatus, Severity
+from app.verification.models import (
+    EvidenceVerificationResult,
+    MismatchType,
+    StructuredClaims,
+    VerificationStatus,
+)
 
 
 def _create_sample_incident(
@@ -1092,3 +1099,346 @@ class TestOllamaClientMocked:
         monkeypatch.setattr(httpx.AsyncClient, "get", mock_get)
         client = OllamaClient()
         assert await client.check_health() is False
+
+
+class TestAIVerificationPipelineIntegration:
+    """Integration tests connecting AI investigation pipeline with Evidence Verification Engine (Phase 2 Checkpoint 3B)."""
+
+    def _setup_test_db(self, tmp_path, events=None, incidents=None):
+        db_path = tmp_path / "test_pipeline.db"
+        db = AegisDatabase(str(db_path))
+        if events:
+            db.store_events(events)
+        if incidents:
+            db.store_incidents(incidents)
+        return db
+
+    @pytest.mark.anyio
+    async def test_1_successful_ai_analysis_followed_by_verified_result(self, monkeypatch, tmp_path):
+        t1 = datetime(2024, 11, 20, 10, 5, tzinfo=timezone.utc)
+        ev1 = NormalizedEvent(
+            event_id="E001",
+            timestamp=t1,
+            user="admin",
+            device="WS-001",
+            ip="192.168.1.10",
+            event_type="login_success",
+            process="powershell.exe",
+            source=EventSource.AUTHENTICATION,
+            raw_data={"test": "data"},
+        )
+        inc = _create_sample_incident(
+            evidence_ids=["E001"],
+            user="admin",
+            device="WS-001",
+        )
+        db = self._setup_test_db(tmp_path, events=[ev1], incidents=[inc])
+
+        valid_ai_json = json.dumps({
+            "summary": "Valid executive narrative.",
+            "attack_interpretation": "Admin login detected.",
+            "potential_impact": "Host access.",
+            "recommended_actions": ["Audit privileges"],
+            "cited_event_ids": ["E001"],
+        })
+
+        async def mock_post(client_self, url, **kwargs):
+            return httpx.Response(
+                status_code=200,
+                json={"response": valid_ai_json},
+                request=httpx.Request("POST", url),
+            )
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+        client = OllamaClient()
+        claims = StructuredClaims(claimed_user="admin", claimed_device="WS-001")
+        analysis, ai_status, err, ver_res = await client.analyze_and_verify_incident(
+            incident=inc,
+            db=db,
+            claims=claims,
+        )
+
+        assert ai_status == AIStatus.SUCCESS
+        assert err is None
+        assert ver_res.status == VerificationStatus.VERIFIED
+        assert ver_res.valid_citation_count == 1
+        assert inc.ai_status == "SUCCESS"
+        assert inc.ai_verification["status"] == "VERIFIED"
+        db.close()
+
+    @pytest.mark.anyio
+    async def test_2_successful_ai_analysis_followed_by_partial_result(self, monkeypatch, tmp_path):
+        t1 = datetime(2024, 11, 20, 10, 5, tzinfo=timezone.utc)
+        t2 = datetime(2024, 11, 20, 10, 15, tzinfo=timezone.utc)
+        ev1 = NormalizedEvent(event_id="E001", timestamp=t1, user="admin", event_type="login_success", source=EventSource.AUTHENTICATION, raw_data={})
+        ev2 = NormalizedEvent(event_id="E002", timestamp=t2, user="admin", event_type="process_start", source=EventSource.ENDPOINT, raw_data={})
+        inc = _create_sample_incident(evidence_ids=["E001", "E002"], user="admin")
+        db = self._setup_test_db(tmp_path, events=[ev1, ev2], incidents=[inc])
+
+        # AI cites only E001 (omitting E002)
+        partial_ai_json = json.dumps({
+            "summary": "Partial citation narrative.",
+            "attack_interpretation": "Interpreted partial events.",
+            "potential_impact": "Limited scope.",
+            "recommended_actions": ["Review other events"],
+            "cited_event_ids": ["E001"],
+        })
+
+        async def mock_post(client_self, url, **kwargs):
+            return httpx.Response(
+                status_code=200,
+                json={"response": partial_ai_json},
+                request=httpx.Request("POST", url),
+            )
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+        client = OllamaClient()
+        analysis, ai_status, err, ver_res = await client.analyze_and_verify_incident(
+            incident=inc,
+            db=db,
+        )
+
+        assert ai_status == AIStatus.SUCCESS
+        assert ver_res.status == VerificationStatus.PARTIAL
+        assert ver_res.uncited_evidence_ids == ["E002"]
+        assert inc.ai_verification["status"] == "PARTIAL"
+        db.close()
+
+    @pytest.mark.anyio
+    async def test_3_successful_ai_analysis_followed_by_unverified_result(self, monkeypatch, tmp_path):
+        t1 = datetime(2024, 11, 20, 10, 5, tzinfo=timezone.utc)
+        ev1 = NormalizedEvent(event_id="E001", timestamp=t1, user="bob", device="WS-001", event_type="login_success", source=EventSource.AUTHENTICATION, raw_data={})
+        inc = _create_sample_incident(evidence_ids=["E001"], user="bob")
+        db = self._setup_test_db(tmp_path, events=[ev1], incidents=[inc])
+
+        valid_ai_json = json.dumps({
+            "summary": "AI succeeded in formatting.",
+            "attack_interpretation": "Attack interpretation.",
+            "potential_impact": "Impact.",
+            "recommended_actions": ["Action"],
+            "cited_event_ids": ["E001"],
+        })
+
+        async def mock_post(client_self, url, **kwargs):
+            return httpx.Response(status_code=200, json={"response": valid_ai_json}, request=httpx.Request("POST", url))
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+        # Claim says user was 'alice', which contradicts actual evidence 'bob'
+        claims = StructuredClaims(claimed_user="alice", claimed_event_ids=["E001"])
+        client = OllamaClient()
+        analysis, ai_status, err, ver_res = await client.analyze_and_verify_incident(
+            incident=inc,
+            db=db,
+            claims=claims,
+        )
+
+        assert ai_status == AIStatus.SUCCESS
+        # AI succeeded, but evidence verification failed closed to UNVERIFIED due to user mismatch
+        assert ver_res.status == VerificationStatus.UNVERIFIED
+        assert any(d.mismatch_type == MismatchType.USER_MISMATCH for d in ver_res.discrepancies)
+        assert inc.ai_status == "SUCCESS"
+        assert inc.ai_verification["status"] == "UNVERIFIED"
+        db.close()
+
+    @pytest.mark.anyio
+    async def test_4_slm_unavailable_but_verification_still_runs(self, monkeypatch, tmp_path):
+        t1 = datetime(2024, 11, 20, 10, 5, tzinfo=timezone.utc)
+        ev1 = NormalizedEvent(event_id="E001", timestamp=t1, user="admin", event_type="login_success", source=EventSource.AUTHENTICATION, raw_data={})
+        inc = _create_sample_incident(evidence_ids=["E001"], user="admin")
+        db = self._setup_test_db(tmp_path, events=[ev1], incidents=[inc])
+
+        async def mock_post(client_self, url, **kwargs):
+            raise httpx.ConnectError("Ollama daemon is offline")
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+        client = OllamaClient()
+        analysis, ai_status, err, ver_res = await client.analyze_and_verify_incident(
+            incident=inc,
+            db=db,
+        )
+
+        assert ai_status == AIStatus.UNAVAILABLE
+        assert "unavailable or offline" in err
+        # Fallback analysis cites E001, and verification successfully confirms E001 in DB
+        assert ver_res.status == VerificationStatus.VERIFIED
+        assert inc.ai_status == "UNAVAILABLE"
+        assert inc.ai_verification["status"] == "VERIFIED"
+        db.close()
+
+    @pytest.mark.anyio
+    async def test_5_slm_timeout_but_verification_still_runs(self, monkeypatch, tmp_path):
+        t1 = datetime(2024, 11, 20, 10, 5, tzinfo=timezone.utc)
+        ev1 = NormalizedEvent(event_id="E001", timestamp=t1, user="admin", event_type="login_success", source=EventSource.AUTHENTICATION, raw_data={})
+        inc = _create_sample_incident(evidence_ids=["E001"], user="admin")
+        db = self._setup_test_db(tmp_path, events=[ev1], incidents=[inc])
+
+        async def mock_post(client_self, url, **kwargs):
+            raise httpx.ReadTimeout("Ollama inference timed out")
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+        client = OllamaClient()
+        analysis, ai_status, err, ver_res = await client.analyze_and_verify_incident(
+            incident=inc,
+            db=db,
+        )
+
+        assert ai_status == AIStatus.FALLBACK
+        assert "timed out" in err
+        assert ver_res.status == VerificationStatus.VERIFIED
+        assert inc.ai_status == "FALLBACK"
+        assert inc.ai_verification["status"] == "VERIFIED"
+        db.close()
+
+    @pytest.mark.anyio
+    async def test_6_invalid_slm_response_followed_by_fallback_and_verification(self, monkeypatch, tmp_path):
+        t1 = datetime(2024, 11, 20, 10, 5, tzinfo=timezone.utc)
+        ev1 = NormalizedEvent(event_id="E001", timestamp=t1, user="admin", event_type="login_success", source=EventSource.AUTHENTICATION, raw_data={})
+        inc = _create_sample_incident(evidence_ids=["E001"], user="admin")
+        db = self._setup_test_db(tmp_path, events=[ev1], incidents=[inc])
+
+        async def mock_post(client_self, url, **kwargs):
+            return httpx.Response(status_code=200, json={"response": "{malformed json"}, request=httpx.Request("POST", url))
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+        client = OllamaClient()
+        analysis, ai_status, err, ver_res = await client.analyze_and_verify_incident(
+            incident=inc,
+            db=db,
+        )
+
+        assert ai_status == AIStatus.FALLBACK
+        assert ver_res.status == VerificationStatus.VERIFIED
+        assert inc.ai_status == "FALLBACK"
+        assert inc.ai_verification["status"] == "VERIFIED"
+        db.close()
+
+    @pytest.mark.anyio
+    async def test_7_fabricated_citation_rejected(self, monkeypatch, tmp_path):
+        t1 = datetime(2024, 11, 20, 10, 5, tzinfo=timezone.utc)
+        ev1 = NormalizedEvent(event_id="E001", timestamp=t1, user="admin", event_type="login_success", source=EventSource.AUTHENTICATION, raw_data={})
+        inc = _create_sample_incident(evidence_ids=["E001"], user="admin")
+        db = self._setup_test_db(tmp_path, events=[ev1], incidents=[inc])
+
+        # SLM hallucinates citation E999
+        hallucinated_ai_json = json.dumps({
+            "summary": "Summary with fabricated citation.",
+            "attack_interpretation": "Interpretation.",
+            "potential_impact": "Impact.",
+            "recommended_actions": ["Action"],
+            "cited_event_ids": ["E999"],
+        })
+
+        async def mock_post(client_self, url, **kwargs):
+            return httpx.Response(status_code=200, json={"response": hallucinated_ai_json}, request=httpx.Request("POST", url))
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+        client = OllamaClient()
+        analysis, ai_status, err, ver_res = await client.analyze_and_verify_incident(
+            incident=inc,
+            db=db,
+        )
+
+        # SLM response rejected because of fabricated citation -> triggers fallback
+        assert ai_status == AIStatus.FALLBACK
+        assert "hallucinated/cited untrusted event IDs" in err
+        # Fallback replaced it with valid ground-truth citation E001
+        assert analysis.cited_event_ids == ["E001"]
+        assert ver_res.status == VerificationStatus.VERIFIED
+        db.close()
+
+    @pytest.mark.anyio
+    async def test_8_verification_failure_does_not_crash_triage(self, monkeypatch):
+        incident = _create_sample_incident(evidence_ids=["E001"])
+
+        async def mock_post(client_self, url, **kwargs):
+            return httpx.Response(
+                status_code=200,
+                json={"response": json.dumps({
+                    "summary": "Test summary.",
+                    "attack_interpretation": "Test attack.",
+                    "potential_impact": "Test impact.",
+                    "recommended_actions": ["Action 1"],
+                    "cited_event_ids": ["E001"],
+                })},
+                request=httpx.Request("POST", url),
+            )
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+        # Force verify_incident_evidence to throw an unexpected exception
+        import app.ai.client as client_module
+        def broken_verifier(*args, **kwargs):
+            raise RuntimeError("Simulated internal verifier bug")
+
+        monkeypatch.setattr(client_module, "verify_incident_evidence", broken_verifier)
+
+        client = OllamaClient()
+        # Must NOT raise RuntimeError; must fail closed gracefully
+        analysis, ai_status, err, ver_res = await client.analyze_and_verify_incident(incident=incident)
+
+        assert ai_status == AIStatus.SUCCESS
+        assert ver_res.status == VerificationStatus.UNVERIFIED
+        assert "Verification failure" in ver_res.database_error
+        assert incident.ai_verification["status"] == "UNVERIFIED"
+
+    @pytest.mark.anyio
+    async def test_9_ai_status_and_verification_status_remain_separate(self, monkeypatch, tmp_path):
+        # Incident has evidence E001, but SQLite database is completely empty
+        inc = _create_sample_incident(evidence_ids=["E001"], user="admin")
+        empty_db = self._setup_test_db(tmp_path, events=[], incidents=[inc])
+
+        valid_ai_json = json.dumps({
+            "summary": "Valid AI summary.",
+            "attack_interpretation": "Valid AI interpretation.",
+            "potential_impact": "Valid AI impact.",
+            "recommended_actions": ["Action 1"],
+            "cited_event_ids": ["E001"],
+        })
+
+        async def mock_post(client_self, url, **kwargs):
+            return httpx.Response(status_code=200, json={"response": valid_ai_json}, request=httpx.Request("POST", url))
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+        client = OllamaClient()
+        analysis, ai_status, err, ver_res = await client.analyze_and_verify_incident(
+            incident=inc,
+            db=empty_db,
+        )
+
+        # AI status is SUCCESS, but verification status is UNVERIFIED (due to missing DB event)
+        assert ai_status == AIStatus.SUCCESS
+        assert ver_res.status == VerificationStatus.UNVERIFIED
+        assert inc.ai_status == "SUCCESS"
+        assert inc.ai_verification["status"] == "UNVERIFIED"
+        empty_db.close()
+
+    @pytest.mark.anyio
+    async def test_10_severity_remains_unchanged(self, monkeypatch, tmp_path):
+        inc = _create_sample_incident(
+            severity=Severity.CRITICAL,
+            evidence_ids=["E001"],
+        )
+        empty_db = self._setup_test_db(tmp_path, events=[], incidents=[inc])
+
+        async def mock_post(client_self, url, **kwargs):
+            raise httpx.ConnectError("Offline")
+
+        monkeypatch.setattr(httpx.AsyncClient, "post", mock_post)
+
+        client = OllamaClient()
+        analysis, ai_status, err, ver_res = await client.analyze_and_verify_incident(
+            incident=inc,
+            db=empty_db,
+        )
+
+        assert inc.severity == Severity.CRITICAL
+        assert inc.severity.value == "CRITICAL"
+        empty_db.close()

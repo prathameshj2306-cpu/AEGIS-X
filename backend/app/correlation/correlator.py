@@ -164,37 +164,128 @@ def correlate_detections(
 def build_incidents(
     groups: list[CorrelationGroup],
     id_offset: int = 1,
+    existing_incidents: list[Incident] | None = None,
 ) -> list[Incident]:
-    """Convert correlation groups into Incident objects.
+    """Convert correlation groups into Incident objects, reconciling with existing records.
 
-    Severity is NOT assigned here — that's the severity classifier's job.
-    This creates incidents with placeholder severity that will be overwritten.
+    If existing_incidents is provided:
+    1. Matches regenerated groups to existing incidents based on stable identity
+       (user identity and evidence event ID membership).
+    2. Preserves existing incident IDs where identity is unchanged.
+    3. Preserves AI analysis, AI status, and AI verification ONLY if evidence remains unchanged.
+    4. Invalidates AI analysis and verification if underlying evidence changed.
+    5. Never transfers analysis/verification between different incidents.
+    6. Assigns strictly non-colliding sequential IDs for newly added incidents.
     """
+    if not existing_incidents:
+        incidents: list[Incident] = []
+        for i, group in enumerate(groups):
+            incident_id = f"INC{(id_offset + i):06d}"
+            primary_user = next(iter(group.users), None)
+            primary_device = next(iter(group.devices), None)
+            patterns = list({d.rule_name for d in group.detections})
+            detection_ids = [d.detection_id for d in group.detections]
+            title = _build_incident_title(patterns, primary_user)
+            start_time = group.min_time or datetime.now(timezone.utc)
+            end_time = group.max_time or start_time
+
+            incidents.append(Incident(
+                incident_id=incident_id,
+                title=title,
+                severity="LOW",
+                status=IncidentStatus.OPEN,
+                detected_patterns=patterns,
+                user=primary_user,
+                device=primary_device,
+                start_time=start_time,
+                end_time=end_time,
+                evidence_event_ids=sorted(group.event_ids),
+                detection_ids=detection_ids,
+                severity_rationale="Pending classification",
+                created_at=datetime.now(timezone.utc),
+            ))
+        return incidents
+
+    # Reconcile against existing incidents
     incidents: list[Incident] = []
+    claimed_existing_ids: set[str] = set()
 
-    for i, group in enumerate(groups):
-        incident_id = f"INC{(id_offset + i):06d}"
+    # Track maximum allocated incident ID number to generate safe non-colliding IDs for new groups
+    max_num = id_offset - 1
+    for inc in existing_incidents:
+        if inc.incident_id.startswith("INC"):
+            suffix = inc.incident_id[3:]
+            if suffix.isdigit():
+                max_num = max(max_num, int(suffix))
 
-        # Determine primary user and device
+    for group in groups:
+        group_eids = set(group.event_ids)
+        group_users = set(group.users)
         primary_user = next(iter(group.users), None)
         primary_device = next(iter(group.devices), None)
-
-        # Collect distinct rule names
         patterns = list({d.rule_name for d in group.detections})
         detection_ids = [d.detection_id for d in group.detections]
-
-        # Build title
         title = _build_incident_title(patterns, primary_user)
-
-        # Time bounds
         start_time = group.min_time or datetime.now(timezone.utc)
         end_time = group.max_time or start_time
+
+        matched_incident: Incident | None = None
+        evidence_unchanged = False
+
+        # Phase 1: Look for exact evidence + user match
+        for existing in existing_incidents:
+            if existing.incident_id in claimed_existing_ids:
+                continue
+            existing_eids = set(existing.evidence_event_ids)
+            user_match = (existing.user in group_users) or (not existing.user and not group_users)
+            if user_match and existing_eids == group_eids:
+                matched_incident = existing
+                evidence_unchanged = True
+                claimed_existing_ids.add(existing.incident_id)
+                break
+
+        # Phase 2: If no exact evidence match, look for overlapping evidence for the same user (evidence changed/expanded)
+        if matched_incident is None:
+            for existing in existing_incidents:
+                if existing.incident_id in claimed_existing_ids:
+                    continue
+                existing_eids = set(existing.evidence_event_ids)
+                user_match = (existing.user in group_users) or (not existing.user and not group_users)
+                if user_match and bool(existing_eids & group_eids):
+                    matched_incident = existing
+                    evidence_unchanged = False
+                    claimed_existing_ids.add(existing.incident_id)
+                    break
+
+        if matched_incident is not None:
+            incident_id = matched_incident.incident_id
+            created_at = matched_incident.created_at
+            status = matched_incident.status
+            if evidence_unchanged:
+                # Evidence unchanged: preserve AI analysis and verification
+                ai_analysis = matched_incident.ai_analysis
+                ai_status = matched_incident.ai_status
+                ai_verification = matched_incident.ai_verification
+            else:
+                # Evidence changed: invalidate stale analysis and verification
+                ai_analysis = None
+                ai_status = None
+                ai_verification = None
+        else:
+            # New incident: allocate next monotonic sequential ID
+            max_num += 1
+            incident_id = f"INC{max_num:06d}"
+            created_at = datetime.now(timezone.utc)
+            status = IncidentStatus.OPEN
+            ai_analysis = None
+            ai_status = None
+            ai_verification = None
 
         incidents.append(Incident(
             incident_id=incident_id,
             title=title,
-            severity="LOW",  # Placeholder — severity classifier will set this
-            status=IncidentStatus.OPEN,
+            severity="LOW",
+            status=status,
             detected_patterns=patterns,
             user=primary_user,
             device=primary_device,
@@ -203,7 +294,10 @@ def build_incidents(
             evidence_event_ids=sorted(group.event_ids),
             detection_ids=detection_ids,
             severity_rationale="Pending classification",
-            created_at=datetime.now(timezone.utc),
+            created_at=created_at,
+            ai_analysis=ai_analysis,
+            ai_status=ai_status,
+            ai_verification=ai_verification,
         ))
 
     return incidents

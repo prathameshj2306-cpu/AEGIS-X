@@ -18,7 +18,7 @@ enforcing:
 import json
 import logging
 import re
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Union
 
 import httpx
 
@@ -26,8 +26,15 @@ from app.ai.fallback import generate_deterministic_fallback
 from app.ai.prompts import SYSTEM_PROMPT, build_incident_prompt
 from app.ai.schemas import AIAnalysisOutput, AIStatus
 from app.config import AegisConfig
+from app.database.store import AegisDatabase
 from app.schemas.events import NormalizedEvent
 from app.schemas.incidents import Detection, Incident
+from app.verification.models import (
+    EvidenceVerificationResult,
+    StructuredClaims,
+    VerificationStatus,
+)
+from app.verification.verifier import verify_incident_evidence
 
 logger = logging.getLogger("aegis.ai")
 
@@ -192,22 +199,13 @@ class OllamaClient:
         except Exception:
             return False
 
-    async def analyze_incident(
+    async def _execute_slm_analysis(
         self,
         incident: Incident,
         events: Optional[list[NormalizedEvent]] = None,
         detections: Optional[list[Detection]] = None,
     ) -> Tuple[AIAnalysisOutput, AIStatus, Optional[str]]:
-        """Analyze an incident using local SLM, falling back to deterministic template on any failure.
-
-        Args:
-            incident: Correlated incident instance.
-            events: Optional list of supporting events.
-            detections: Optional list of triggering detections.
-
-        Returns:
-            Tuple of (AIAnalysisOutput, AIStatus, error_message_or_None)
-        """
+        """Internal worker executing Ollama API generation with fallback triggers."""
         prompt = build_incident_prompt(incident, events, detections)
         payload = {
             "model": self.model,
@@ -293,7 +291,7 @@ class OllamaClient:
                 fallback = generate_deterministic_fallback(incident, events, detections)
                 return fallback, AIStatus.FALLBACK, err_msg
 
-            # Requirement 1: Validate AI-cited event IDs against actual incident evidence event IDs
+            # Validate AI-cited event IDs against actual incident evidence event IDs
             valid_evidence_ids = set(incident.evidence_event_ids)
             invalid_citations = []
             seen_citations = set()
@@ -354,3 +352,103 @@ class OllamaClient:
             logger.warning(err_msg)
             fallback = generate_deterministic_fallback(incident, events, detections)
             return fallback, AIStatus.FALLBACK, err_msg
+
+    async def analyze_incident(
+        self,
+        incident: Incident,
+        events: Optional[list[NormalizedEvent]] = None,
+        detections: Optional[list[Detection]] = None,
+        db: Optional[AegisDatabase] = None,
+        claims: Optional[StructuredClaims] = None,
+        tolerance_seconds: float = 0.0,
+        return_verification: bool = False,
+    ) -> Union[
+        Tuple[AIAnalysisOutput, AIStatus, Optional[str]],
+        Tuple[AIAnalysisOutput, AIStatus, Optional[str], EvidenceVerificationResult],
+    ]:
+        """Analyze an incident using local SLM, falling back to deterministic template on any failure,
+        and independently executing deterministic evidence verification.
+
+        Args:
+            incident: Correlated incident instance.
+            events: Optional list of supporting events.
+            detections: Optional list of triggering detections.
+            db: Optional active AegisDatabase connection for ground-truth verification.
+            claims: Optional structured claims to cross-examine against evidence.
+            tolerance_seconds: Time tolerance for timestamp bounds checking.
+            return_verification: If True, returns 4-tuple including EvidenceVerificationResult.
+
+        Returns:
+            Tuple of (AIAnalysisOutput, AIStatus, error_message_or_None)
+            OR 4-tuple if return_verification=True.
+        """
+        analysis_output, ai_status, err_msg = await self._execute_slm_analysis(
+            incident=incident,
+            events=events,
+            detections=detections,
+        )
+
+        # Attach AI analysis fields to incident model
+        incident.ai_analysis = analysis_output.model_dump()
+        incident.ai_status = ai_status.value
+
+        # Execute deterministic evidence verification independently
+        try:
+            verification_result = verify_incident_evidence(
+                incident=incident,
+                db=db,
+                events=events,
+                claims=claims,
+                ai_citations=analysis_output.cited_event_ids,
+                tolerance_seconds=tolerance_seconds,
+            )
+        except Exception as ver_ex:
+            logger.warning(f"Verification engine execution error: {ver_ex}")
+            verification_result = EvidenceVerificationResult(
+                incident_id=incident.incident_id,
+                status=VerificationStatus.UNVERIFIED,
+                total_evidence_count=len(incident.evidence_event_ids),
+                resolved_evidence_count=0,
+                missing_evidence_count=len(incident.evidence_event_ids),
+                cited_evidence_count=len(analysis_output.cited_event_ids),
+                valid_citation_count=0,
+                verified_evidence_ids=[],
+                uncited_evidence_ids=list(incident.evidence_event_ids),
+                missing_evidence_ids=list(incident.evidence_event_ids),
+                invalid_citation_ids=[],
+                duplicate_citation_ids=[],
+                discrepancies=[],
+                verification_rationale=[f"Verification failure: {type(ver_ex).__name__}"],
+                database_error=f"Verification failure: {type(ver_ex).__name__}",
+            )
+
+        # Attach verification outcome to incident
+        incident.ai_verification = verification_result.model_dump(mode="json")
+
+        if return_verification:
+            return analysis_output, ai_status, err_msg, verification_result
+        return analysis_output, ai_status, err_msg
+
+    async def analyze_and_verify_incident(
+        self,
+        incident: Incident,
+        db: Optional[AegisDatabase] = None,
+        events: Optional[list[NormalizedEvent]] = None,
+        detections: Optional[list[Detection]] = None,
+        claims: Optional[StructuredClaims] = None,
+        tolerance_seconds: float = 0.0,
+    ) -> Tuple[AIAnalysisOutput, AIStatus, Optional[str], EvidenceVerificationResult]:
+        """Execute AI analysis and independent evidence verification pipeline.
+
+        Returns:
+            Tuple of (AIAnalysisOutput, AIStatus, error_message, EvidenceVerificationResult).
+        """
+        return await self.analyze_incident(
+            incident=incident,
+            events=events,
+            detections=detections,
+            db=db,
+            claims=claims,
+            tolerance_seconds=tolerance_seconds,
+            return_verification=True,
+        )

@@ -114,5 +114,8 @@ class Incident(BaseModel):
     ai_verification: Optional[dict[str, Any]] = Field(
         None, description="Evidence verification results"
     )
+    batch_id: Optional[str] = Field(
+        None, description="Associated ingestion batch ID"
+    )
 
     model_config = {"frozen": False, "extra": "forbid"}

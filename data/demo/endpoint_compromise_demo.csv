@@ -1,0 +1,5 @@
+timestamp,user,device,ip,event_type,source,process
+2024-11-24T08:02:15+00:00,admin,SRV-FINANCE01,192.168.10.45,privilege_escalation,endpoint,
+2024-11-24T08:02:30+00:00,admin,SRV-FINANCE01,192.168.10.45,process_start,endpoint,cmd.exe /c whoami /priv
+2024-11-24T08:03:00+00:00,admin,SRV-FINANCE01,192.168.10.45,process_start,endpoint,mimikatz.exe
+2024-11-24T08:04:15+00:00,admin,SRV-FINANCE01,192.168.10.45,process_start,endpoint,psexec.exe \\SRV-DC01 -u admin -p secret cmd.exe

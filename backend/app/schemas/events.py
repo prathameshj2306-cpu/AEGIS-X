@@ -49,6 +49,7 @@ class NormalizedEvent(BaseModel):
     event_type: str = Field(..., description="Normalized event type")
     process: Optional[str] = Field(None, description="Process name or command line")
     source: EventSource = Field(..., description="Log source category")
+    batch_id: Optional[str] = Field(None, description="Ingestion batch identifier")
     raw_data: dict[str, Any] = Field(
         default_factory=dict,
         description="Original log record for evidence traceability"

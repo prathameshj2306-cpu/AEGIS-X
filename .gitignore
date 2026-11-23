@@ -44,3 +44,12 @@ data/generated/
 # Model files
 *.gguf
 *.bin
+# Test and generated artifacts
+.pytest_cache/
+reports/
+
+# Local runtime databases
+*.db
+# Test and generated artifacts
+.pytest_cache/
+reports/
